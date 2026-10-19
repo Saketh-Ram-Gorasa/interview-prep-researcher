@@ -1,0 +1,12 @@
+# Pin exact versions after the Day 0 install (pip freeze), per the plan.
+langgraph
+fastapi
+uvicorn
+pydantic
+httpx
+trafilatura
+pypdf
+rank_bm25
+numpy
+ddgs
+ruff
