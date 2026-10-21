@@ -2,7 +2,7 @@
 
 An agentic research pipeline that builds a cited interview briefing for **new-grad and intern software roles** at well-known companies. It takes a company, a role, the job description and your resume. It returns six sections: company snapshot, likely interview rounds, ranked prep topics, resume deep-dive questions, JD-vs-resume gaps and a study schedule.
 
-Status: **pipeline code written** (tools, RAG, agents, workflow). Checked offline with stubbed model calls and with a live search; not yet run end-to-end on the local model. API and evals are next.
+Status: **initial code complete** (agents, tools, RAG, workflow, API, evals). Checked offline with stubbed model calls and with a live search; not yet run end-to-end on the local model, and `evals/dataset.json` has no cases yet.
 
 ## Setup (Windows, local only)
 
@@ -29,8 +29,9 @@ Python 3.11 is used because it is already installed; the plan's 3.12 target work
 | `backend/config.py` | Models, limits, source policy, topic list, target companies and roles |
 | `backend/schemas.py` | Records shared by agents, workflow, API and evals (request, evidence, report) |
 | `backend/models.py` | Chat model call (Ollama native API) with structured output |
-| `backend/workflow.py` | Graph state, LangGraph loop, budgets, terminal entry point |
-| `backend/agents/planner.py` | Queries and coverage check |
+| `backend/workflow.py` | Graph state, per-pass scope, stop/widen loop, budgets, terminal entry point |
+| `backend/agents/planner.py` | Search queries for the evidence still needed |
+| `backend/agents/coverage.py` | Whether retrieved passages answer a research question |
 | `backend/agents/researcher.py` | Company, tech and interview-experience research |
 | `backend/agents/synthesizer.py` | Six sections, citations, support checks, schedule |
 | `backend/rag/ingest.py` | Normalize, deduplicate, chunk |
@@ -38,7 +39,7 @@ Python 3.11 is used because it is already installed; the plan's 3.12 target work
 | `backend/rag/retrieval.py` | Hybrid search, ranking, support counts |
 | `backend/tools/search.py` | Web discovery (ddgs) and page fetching |
 | `backend/tools/resume.py` | Resume parsing |
-| `backend/main.py` | FastAPI routes |
+| `backend/main.py` | FastAPI routes: start, poll, cancel runs; resume PDF sent as base64 in JSON |
 | `evals/` | Frozen evaluation runner and dataset |
 | `web/` | Next.js frontend (built last) |
 
@@ -57,7 +58,7 @@ Pilot (first evaluation set): Google, Amazon, Microsoft, Meta, Goldman Sachs.
 Expansion: Apple, NVIDIA, Qualcomm, Adobe, Salesforce, Oracle, Atlassian, Uber, Bloomberg, JPMorgan Chase.
 Role families: new grad (SWE New Grad, SDE I, ...) and intern (SWE Intern, SDE Intern, Summer Analyst).
 
-## Commands (planned, not yet implemented)
+## Commands (implemented; not yet run end-to-end on the local model)
 
 ```bash
 python -m backend.workflow        # terminal run

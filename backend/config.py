@@ -23,6 +23,7 @@ FETCH_TIMEOUT_S = 15
 RUN_BUDGET_S = 300
 SEARCH_REGION = os.getenv("SEARCH_REGION", "us-en")  # ddgs region, e.g. in-en
 USER_AGENT = "InterviewPrepResearcher/0.1 (personal research tool)"
+MAX_UPLOAD_BYTES = 5_000_000  # resume PDF limit for the API
 
 # --- Retrieval
 CHUNK_TOKENS = 500

@@ -34,7 +34,11 @@ def from_html(
 
 
 def from_text(
-    text: str, title: str, company: str, published: date | None = None
+    text: str,
+    title: str,
+    company: str,
+    published: date | None = None,
+    peer: bool = False,
 ) -> Source:
     """A pasted or uploaded document supplied with the request."""
     source_id = _hash(text)
@@ -47,6 +51,7 @@ def from_text(
         fetched=date.today(),
         tier="supplied",
         company=company,
+        peer=peer,
     )
 
 

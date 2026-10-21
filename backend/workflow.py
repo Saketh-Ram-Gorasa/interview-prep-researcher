@@ -2,6 +2,7 @@
 
 import argparse
 import operator
+import threading
 import time
 from datetime import date
 from pathlib import Path
@@ -11,7 +12,7 @@ from langgraph.graph import END, START, StateGraph
 from langgraph.types import Send
 
 from backend import config
-from backend.agents import planner, researcher, synthesizer
+from backend.agents import coverage, planner, researcher, synthesizer
 from backend.models import usage
 from backend.rag import ingest, retrieval
 from backend.schemas import (
@@ -35,7 +36,6 @@ class State(TypedDict):
     results: Annotated[
         list[ResearchResult], operator.add
     ]  # parallel branches append here
-    supplied_experiences: list[Experience]
     experiences: list[Experience]
     passages: dict[Branch, list[Evidence]]
     corpus: dict[str, Evidence]
@@ -43,25 +43,26 @@ class State(TypedDict):
     report: Report
 
 
-def run(request: Request) -> Report:
-    """The one entry point shared by the terminal, API and evals."""
+def run(request: Request, cancel: threading.Event | None = None) -> Report | None:
+    """The one entry point shared by the terminal, API and evals. Returns None if cancelled."""
     usage.clear()
     started = time.monotonic()
-    state = GRAPH.invoke(
-        {
-            "request": request,
-            "started": started,
-            "pass_no": 1,
-            "results": [],
-            "supplied_experiences": [
-                e for s in request.supplied if (e := researcher.read_account(s))
-            ],
-            "experiences": [],
-            "passages": {"company": [], "technology": [], "interviews": []},
-            "corpus": {},
-            "gaps": {},
-        }
-    )
+    supplied = researcher.research(
+        "interviews", [], request, exclude=set(), max_pages=0
+    )  # reads supplied docs once
+    initial = {
+        "request": request,
+        "started": started,
+        "pass_no": 1,
+        "results": [supplied],
+        "experiences": [],
+        "passages": {"company": [], "technology": [], "interviews": []},
+        "corpus": {},
+        "gaps": {},
+    }
+    for state in GRAPH.stream(initial, stream_mode="values"):
+        if cancel and cancel.is_set():
+            return None  # stops at the next step boundary
     report = state["report"]
     report.run.duration_s = round(time.monotonic() - started, 1)
     report.run.model_calls = usage["calls"]
@@ -69,18 +70,25 @@ def run(request: Request) -> Report:
 
 
 def _plan(state: State) -> dict:
+    request, pass_no = state["request"], state["pass_no"]
+    companies, roles = _scope(request, pass_no)
+    needs = (
+        _questions(request)
+        if pass_no == 1
+        else {b: g for b, g in state["gaps"].items() if b == "interviews"}
+    )
     return {
-        "queries": planner.search_queries(
-            state["request"], state["pass_no"], state["gaps"]
-        )
+        "queries": planner.plan(request, companies, roles, needs)
+        if companies and needs
+        else []
     }
 
 
 def _dispatch(state: State) -> list[Send] | str:
     """One research branch per query branch, sharing what is left of the page budget."""
-    fetched = _fetched_urls(state)
+    seen = {s.url for r in state["results"] for s in r.sources}
     branches = sorted({q.branch for q in state["queries"]})
-    remaining = config.MAX_FETCHED_PAGES - len(fetched)
+    remaining = config.MAX_FETCHED_PAGES - _pages_fetched(state)
     if not branches or remaining <= 0:
         return (
             "collect" if state["pass_no"] == 1 else "synthesize"
@@ -92,7 +100,7 @@ def _dispatch(state: State) -> list[Send] | str:
                 "branch": branch,
                 "queries": [q for q in state["queries"] if q.branch == branch],
                 "request": state["request"],
-                "exclude": fetched,
+                "exclude": seen,
                 "max_pages": remaining // len(branches),
             },
         )
@@ -107,14 +115,19 @@ def _research(payload: dict) -> dict:
 def _collect(state: State) -> dict:
     """Merge every pass so far, index it, retrieve passages per question and check coverage."""
     request = state["request"]
-    sources = ingest.dedupe(
-        request.supplied + [s for r in state["results"] for s in r.sources]
-    )
-    kept = {s.source_id for s in sources}
-    found = state["supplied_experiences"] + [
-        e for r in state["results"] for e in r.experiences
+    sources = [
+        s
+        for s in ingest.dedupe([s for r in state["results"] for s in r.sources])
+        if s.published is None
+        or s.published <= request.as_of  # nothing after the cutoff
     ]
-    accounts = {e.source_id: e for e in found if e.source_id in kept}
+    kept = {s.source_id for s in sources}
+    accounts = {
+        e.source_id: e
+        for r in state["results"]
+        for e in r.experiences
+        if e.source_id in kept
+    }
 
     chunks = [
         c
@@ -125,8 +138,8 @@ def _collect(state: State) -> dict:
         chunks
     )  # shortcut: re-embeds every chunk each pass; cache vectors by chunk_id if slow
 
-    questions = planner.research_questions(request)
-    interview_companies = {request.company, *planner.scope(request, 3)[0]}
+    questions = _questions(request)
+    interview_companies = {request.company, *_peers(request.company)}
     passages = {
         branch: retrieval.search(
             index,
@@ -144,9 +157,9 @@ def _collect(state: State) -> dict:
         branch: gap for branch, gap in state["gaps"].items() if branch not in checked
     }
     for branch, question in checked.items():
-        coverage = planner.check_coverage(question, passages[branch])
-        if not coverage.answered:
-            gaps[branch] = coverage.missing
+        result = coverage.check(question, passages[branch])
+        if not result.answered:
+            gaps[branch] = result.missing
 
     return {
         "passages": passages,
@@ -169,7 +182,6 @@ def _next(state: State) -> str:
 
 
 def _synthesize(state: State) -> dict:
-    request = state["request"]
     topics = retrieval.rank_topics(state["experiences"], state["corpus"])
     evidence = {p.chunk_id: p for group in state["passages"].values() for p in group}
     evidence |= {i: state["corpus"][i] for t in topics for i in t.citations}
@@ -180,12 +192,12 @@ def _synthesize(state: State) -> dict:
             embed_model=config.EMBED_MODEL,
             passes=state["pass_no"] - 1,
             duration_s=0,
-            pages_fetched=len(_fetched_urls(state)),
+            pages_fetched=_pages_fetched(state),
             errors=[e for r in state["results"] for e in r.errors],
         )
     )
     report = synthesizer.write_report(
-        request,
+        state["request"],
         state["passages"],
         evidence,
         topics,
@@ -196,8 +208,36 @@ def _synthesize(state: State) -> dict:
     return {"report": report}
 
 
-def _fetched_urls(state: State) -> set[str]:
-    return {s.url for r in state["results"] for s in r.sources}
+def _scope(request: Request, pass_no: int) -> tuple[list[str], list[str]]:
+    """Companies and roles per pass: the target role, then related roles, then peer companies."""
+    if pass_no == 1:
+        return [request.company], [request.role]
+    if pass_no == 2:
+        related = "intern" if request.role_family == "new_grad" else "new_grad"
+        return [request.company], config.ROLE_FAMILIES[related]
+    return _peers(request.company), [request.role]
+
+
+def _peers(company: str) -> list[str]:
+    group = config.COMPANIES.get(company, {}).get("group")
+    return [
+        name
+        for name, c in config.COMPANIES.items()
+        if c["group"] == group and name != company
+    ]
+
+
+def _questions(request: Request) -> dict[Branch, str]:
+    return {
+        b: q.format(company=request.company, role=request.role)
+        for b, q in planner.QUESTIONS.items()
+    }
+
+
+def _pages_fetched(state: State) -> int:
+    return len(
+        {s.url for r in state["results"] for s in r.sources if s.tier != "supplied"}
+    )
 
 
 def _graph():
