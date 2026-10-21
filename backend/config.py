@@ -20,7 +20,6 @@ QUERIES_PER_PASS = 4
 RESULTS_PER_QUERY = 5
 MAX_FETCHED_PAGES = 20
 FETCH_TIMEOUT_S = 15
-FETCH_RETRIES = 2
 RUN_BUDGET_S = 300
 SEARCH_REGION = os.getenv("SEARCH_REGION", "us-en")  # ddgs region, e.g. in-en
 USER_AGENT = "InterviewPrepResearcher/0.1 (personal research tool)"
@@ -31,6 +30,7 @@ CHUNK_OVERLAP_TOKENS = 80
 CANDIDATES_PER_PATH = 20
 TOP_PASSAGES = 8
 RRF_K = 60
+TOP_TOPICS = 10  # scored as topic recall/precision at 10
 NEWS_WINDOW_DAYS = 183
 
 # --- Source policy

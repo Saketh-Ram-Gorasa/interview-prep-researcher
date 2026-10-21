@@ -46,13 +46,16 @@ class _Support(BaseModel):
 def write_report(
     request: Request,
     passages: dict[Branch, list[Evidence]],
+    evidence: dict[str, Evidence],
     topics: list[RankedTopic],
     missing: list[str],
     run: RunInfo,
     status: Literal["complete", "partial"],
 ) -> Report:
-    """Write every section, check claim support, and assemble the report."""
-    evidence = {p.chunk_id: p for group in passages.values() for p in group}
+    """Write every section, check claim support, and assemble the report.
+
+    `passages` are what each section's prompt sees; `evidence` is every chunk the report may cite.
+    """
     snapshot = _company_snapshot(request, passages["company"] + passages["technology"])
     rounds = _interview_rounds(request, passages["interviews"])
     _check_support(snapshot.claims, evidence)

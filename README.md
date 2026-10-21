@@ -2,7 +2,7 @@
 
 An agentic research pipeline that builds a cited interview briefing for **new-grad and intern software roles** at well-known companies. It takes a company, a role, the job description and your resume. It returns six sections: company snapshot, likely interview rounds, ranked prep topics, resume deep-dive questions, JD-vs-resume gaps and a study schedule.
 
-Status: **scaffold only.** Modules hold a one-line description of what they will do; nothing runs yet.
+Status: **pipeline code written** (tools, RAG, agents, workflow). Checked offline with stubbed model calls and with a live search; not yet run end-to-end on the local model. API and evals are next.
 
 ## Setup (Windows, local only)
 

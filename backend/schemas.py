@@ -5,23 +5,11 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, model_validator
 
-from backend.config import TOPICS
+from backend.config import MODE, TOPICS
 
 Branch = Literal["company", "technology", "interviews"]
 Tier = Literal["official", "community", "other", "supplied"]
 TopicId = Literal[tuple(TOPICS)]  # constrains model output to known topic IDs
-
-
-class Request(BaseModel):
-    company: str
-    role: str
-    role_family: Literal["new_grad", "intern"] = "new_grad"
-    jd_text: str
-    resume_text: str = ""
-    interview_date: date | None = None
-    daily_study_minutes: int = Field(90, ge=15, le=600)
-    mode: Literal["live", "frozen"] = "live"
-    as_of: date = Field(default_factory=date.today)
 
 
 class Query(BaseModel):
@@ -42,6 +30,21 @@ class Source(BaseModel):
     tier: Tier
     company: str
     peer: bool = False
+
+
+class Request(BaseModel):
+    company: str
+    role: str
+    role_family: Literal["new_grad", "intern"] = "new_grad"
+    jd_text: str
+    resume_text: str = ""
+    interview_date: date | None = None
+    daily_study_minutes: int = Field(90, ge=15, le=600)
+    mode: Literal["live", "frozen"] = MODE
+    supplied: list[
+        Source
+    ] = []  # pasted or uploaded evidence; the only corpus in frozen mode
+    as_of: date = Field(default_factory=date.today)
 
 
 class Experience(BaseModel):
@@ -95,7 +98,6 @@ class RankedTopic(BaseModel):
     rank: int
     accounts_with_topic: int  # independent experience groups that mention it
     accounts_total: int  # independent experience groups in the eligible corpus
-    confidence: Literal["high", "medium", "low"]
     confidence_reason: str
     citations: list[str] = []
 
