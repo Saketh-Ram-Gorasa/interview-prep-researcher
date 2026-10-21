@@ -5,13 +5,14 @@ import os
 # "live" searches and fetches; "frozen" uses only the supplied corpus (evaluation).
 MODE = os.getenv("MODE", "live")
 
-# --- Models (Ollama's OpenAI-compatible endpoint; context size is set on the server, see .env.example)
-LLM_BASE_URL = os.getenv("LLM_BASE_URL", "http://localhost:11434/v1")
-CHAT_MODEL = os.getenv("CHAT_MODEL", "qwen3:4b")  # confirm in the Day 0 speed test
+# --- Models (Ollama native API: context size and thinking are set per request)
+LLM_BASE_URL = os.getenv("LLM_BASE_URL", "http://localhost:11434")
+CHAT_MODEL = os.getenv("CHAT_MODEL", "qwen3:4b")
 EMBED_MODEL = os.getenv("EMBED_MODEL", "nomic-embed-text")
+NUM_CTX = 8192
 MAX_OUTPUT_TOKENS = 2048
 LLM_CONCURRENCY = 1  # 4 GB VRAM: one model call at a time
-STRUCTURED_OUTPUT_RETRIES = 1
+EXTRACT_CHARS = 12_000  # page text sent when reading an interview account (~3k tokens)
 
 # --- Research loop budgets
 MAX_PASSES = 3  # target role -> related roles at the company -> peer companies
@@ -69,6 +70,59 @@ ROLE_FAMILIES = {
         "Software Development Engineer Intern",
         "Engineering Summer Analyst",
     ],
+}
+
+# --- Topic list. The synthesizer ranks only these IDs and eval labels use the same IDs,
+# so topic recall/precision is an exact match. Add an ID rather than renaming one.
+TOPICS = {
+    # Data structures and algorithms
+    "dsa.arrays_hashing": "Arrays, strings and hashing",
+    "dsa.two_pointers_sliding_window": "Two pointers and sliding window",
+    "dsa.binary_search": "Binary search",
+    "dsa.sorting": "Sorting and custom comparators",
+    "dsa.stacks_queues": "Stacks, queues and monotonic stacks",
+    "dsa.linked_lists": "Linked lists",
+    "dsa.trees": "Binary trees, BSTs and traversals",
+    "dsa.heaps": "Heaps, priority queues and top-k",
+    "dsa.graphs_traversal": "Graph and grid traversal (BFS, DFS)",
+    "dsa.graphs_advanced": "Shortest paths, topological sort and union-find",
+    "dsa.dynamic_programming": "Dynamic programming",
+    "dsa.greedy_intervals": "Greedy algorithms and intervals",
+    "dsa.backtracking": "Recursion and backtracking",
+    "dsa.tries": "Tries and string search",
+    "dsa.bit_math": "Bit manipulation and math",
+    "dsa.complexity": "Time and space complexity analysis",
+    "dsa.design_data_structure": "Design a data structure (LRU cache, iterators)",
+    # Coding practice
+    "coding.online_assessment": "Timed online assessment (HackerRank, Codility)",
+    "coding.edge_cases_testing": "Edge cases, clean code and testing",
+    "coding.debugging": "Debugging and code reading",
+    "coding.language": "Language fundamentals (Java, C++, Python)",
+    "coding.object_oriented_design": "Object-oriented and low-level design",
+    # CS fundamentals
+    "cs.operating_systems": "Operating systems (processes, memory, scheduling)",
+    "cs.concurrency": "Concurrency (threads, locks, deadlocks)",
+    "cs.networking": "Networking (HTTP, TCP/IP, DNS)",
+    "cs.databases_sql": "Databases and SQL (joins, indexes, transactions)",
+    "cs.computer_architecture": "Computer architecture (caches, memory hierarchy)",
+    "cs.c_low_level": "C/C++ low-level programming (pointers, memory)",
+    # System design (new-grad depth)
+    "design.scalability_basics": "Scalability basics (caching, load balancing, sharding)",
+    "design.api_design": "API design (REST, data models)",
+    "design.small_system": "Design a small system (URL shortener, rate limiter)",
+    # Behavioral
+    "behavioral.star_stories": "Behavioral stories in STAR format",
+    "behavioral.amazon_leadership_principles": "Amazon Leadership Principles",
+    "behavioral.googleyness": "Googleyness and leadership",
+    "behavioral.motivation": "Why this company and role",
+    "behavioral.project_deep_dive": "Resume project and internship deep dive",
+    # Aptitude and domain
+    "aptitude.quant_reasoning": "Quantitative aptitude and logical reasoning",
+    "aptitude.probability_puzzles": "Probability, puzzles and brain teasers",
+    "domain.finance_basics": "Markets and finance basics",
+    "domain.ml_basics": "Machine learning fundamentals",
+    "domain.web_frontend": "Web and frontend fundamentals (JavaScript, React)",
+    "domain.cloud_linux_git": "Cloud, Linux and Git basics",
 }
 
 # --- Companies. "group" defines peers for the last widening pass; "pilot" marks the first eval set.

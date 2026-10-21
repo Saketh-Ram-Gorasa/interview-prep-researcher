@@ -13,7 +13,7 @@ pip install -r requirements.txt
 copy .env.example .env
 ```
 
-Install [Ollama](https://ollama.com), set `OLLAMA_CONTEXT_LENGTH=8192` before starting it, then:
+Install [Ollama](https://ollama.com), then:
 
 ```bash
 ollama pull qwen3:4b
@@ -26,8 +26,9 @@ Python 3.11 is used because it is already installed; the plan's 3.12 target work
 
 | Path | Owns |
 |------|------|
-| `backend/config.py` | Models, limits, source policy, target companies and roles |
-| `backend/models.py` | Chat model client and structured-output helper |
+| `backend/config.py` | Models, limits, source policy, topic list, target companies and roles |
+| `backend/schemas.py` | Records shared by agents, workflow, API and evals (request, evidence, report) |
+| `backend/models.py` | Chat model call (Ollama native API) with structured output |
 | `backend/workflow.py` | Graph state, LangGraph loop, budgets, terminal entry point |
 | `backend/agents/planner.py` | Queries and coverage check |
 | `backend/agents/researcher.py` | Company, tech and interview-experience research |

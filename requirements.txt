@@ -1,12 +1,12 @@
-# Pin exact versions after the Day 0 install (pip freeze), per the plan.
-langgraph
-fastapi
-uvicorn
-pydantic
-httpx
-trafilatura
-pypdf
-rank_bm25
-numpy
-ddgs
-ruff
+# Tested with Python 3.11 on Windows (Day 0).
+langgraph==1.2.16
+fastapi==0.148.0
+uvicorn==0.54.0
+pydantic==2.14.1
+httpx==0.28.1
+trafilatura==2.3.1
+pypdf==6.21.1
+rank-bm25==0.2.2
+numpy==2.4.6
+ddgs==9.16.0
+ruff==0.17.1
